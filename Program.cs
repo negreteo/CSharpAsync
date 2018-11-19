@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Net;
+using System.Threading.Tasks;
 using CSharpAsync.models;
 
 namespace CSharpAsync {
@@ -13,14 +14,21 @@ namespace CSharpAsync {
       Console.WriteLine ("Press 1 for Normal Execute");
       Console.WriteLine ("Press 2 for Async Execute");
 
-      var key = Console.ReadKey (true).Key;
+      ConsoleKey key;
+      do {
+        // Key is available - read it
+        key = Console.ReadKey (true).Key;
 
-      if (key.ToString () == "D1") {
-        //Console.WriteLine ("You selected Normal Execute");
-        NormalExecute ();
-      } else if (key.ToString () == "D2") {
-        Console.WriteLine ("You selected Async Execute");
-      }
+        if (key == ConsoleKey.D1) {
+          NormalExecute ();
+        } else if (key == ConsoleKey.D2) {
+          AsyncExecute ();
+        }
+
+      } while (key != ConsoleKey.Escape);
+
+      Console.WriteLine ();
+
     }
 
     private static void NormalExecute () {
@@ -31,7 +39,18 @@ namespace CSharpAsync {
       watch.Stop ();
       var elapsedMs = watch.ElapsedMilliseconds;
 
-      Console.WriteLine ($"Total execution time: { elapsedMs }");
+      Console.WriteLine ($"Total Normal execution time: { elapsedMs }");
+    }
+
+    private static async void AsyncExecute () {
+      var watch = System.Diagnostics.Stopwatch.StartNew ();
+
+      await RunDownloadParallelAsync ();
+
+      watch.Stop ();
+      var elapsedMs = watch.ElapsedMilliseconds;
+
+      Console.WriteLine ($"Total Async execution time: { elapsedMs }");
     }
 
     private static void RunDownloadSync () {
@@ -43,12 +62,47 @@ namespace CSharpAsync {
       }
     }
 
+    private static async Task RunDownloadAsync () {
+      List<string> websites = PrepData ();
+
+      foreach (string site in websites) {
+        WebsiteDataModel results = await Task.Run (() => DownloadWebsite (site));
+        ReportWebsiteInfo (results);
+      }
+    }
+
+    private static async Task RunDownloadParallelAsync () {
+      List<string> websites = PrepData ();
+      List<Task<WebsiteDataModel>> tasks = new List<Task<WebsiteDataModel>> ();
+
+      foreach (string site in websites) {
+        //tasks.Add (Task.Run (() => DownloadWebsite (site)));
+        tasks.Add (DownloadWebsiteAsync (site));
+      }
+
+      var results = await Task.WhenAll (tasks);
+
+      foreach (var item in results) {
+        ReportWebsiteInfo (item);
+      }
+    }
+
     private static WebsiteDataModel DownloadWebsite (string websiteURL) {
       WebsiteDataModel output = new WebsiteDataModel ();
       WebClient client = new WebClient ();
 
       output.WebsiteUrl = websiteURL;
       output.WebsiteData = client.DownloadString (websiteURL);
+
+      return output;
+    }
+
+    private static async Task<WebsiteDataModel> DownloadWebsiteAsync (string websiteURL) {
+      WebsiteDataModel output = new WebsiteDataModel ();
+      WebClient client = new WebClient ();
+
+      output.WebsiteUrl = websiteURL;
+      output.WebsiteData = await client.DownloadStringTaskAsync (websiteURL);
 
       return output;
     }
